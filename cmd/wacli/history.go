@@ -21,6 +21,7 @@ func newHistoryCmd(flags *rootFlags) *cobra.Command {
 	cmd.AddCommand(newHistoryCoverageCmd(flags))
 	cmd.AddCommand(newHistoryFillCmd(flags))
 	cmd.AddCommand(newHistoryBackfillCmd(flags))
+	cmd.AddCommand(newHistoryImportCmd(flags))
 	return cmd
 }
 

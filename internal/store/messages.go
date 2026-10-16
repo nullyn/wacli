@@ -98,7 +98,11 @@ func (d *DB) UpsertMessage(p UpsertMessageParams) error {
 	if p.Edited {
 		editedTS = unix(p.Timestamp)
 	}
-	return d.q.UpsertMessage(storeCtx(), storedb.UpsertMessageParams{
+	// Only a message new to the store may replace an imported copy; re-saving
+	// a known message must not consume another imported twin.
+	var known int
+	_ = d.sql.QueryRow(`SELECT 1 FROM messages WHERE chat_jid = ? AND msg_id = ?`, p.ChatJID, p.MsgID).Scan(&known)
+	if err := d.q.UpsertMessage(storeCtx(), storedb.UpsertMessageParams{
 		ChatJid:         p.ChatJID,
 		ChatName:        nullString(p.ChatName),
 		MsgID:           p.MsgID,
@@ -132,7 +136,17 @@ func (d *DB) UpsertMessage(p UpsertMessageParams) error {
 		Buttons:         buttonsJSON,
 		ChatJid_2:       strings.TrimSpace(p.ChatJID),
 		MsgID_2:         strings.TrimSpace(p.MsgID),
-	})
+	}); err != nil {
+		return err
+	}
+	if known == 1 || IsImportedMsgID(p.MsgID) || p.ReactionEmoji != "" {
+		return nil
+	}
+	text := p.Text
+	if strings.TrimSpace(text) == "" {
+		text = p.MediaCaption
+	}
+	return d.dropImportedTwins(p.ChatJID, p.FromMe, unix(p.Timestamp), text)
 }
 
 func (d *DB) MarkMessageRevoked(chatJID, msgID string) error {

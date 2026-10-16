@@ -298,6 +298,7 @@ SELECT COUNT(1) FROM messages;
 SELECT m.chat_jid, m.msg_id, m.ts, m.from_me, COALESCE(m.sender_jid,''), COALESCE(m.sender_name,'')
 FROM messages m
 WHERE m.chat_jid = ?
+  AND m.msg_id NOT LIKE 'import-%'
 ORDER BY m.ts ASC, m.rowid ASC
 LIMIT 1;
 
@@ -305,6 +306,7 @@ LIMIT 1;
 SELECT m.chat_jid, m.msg_id, m.ts, m.from_me, COALESCE(m.sender_jid,''), COALESCE(m.sender_name,'')
 FROM messages m
 WHERE m.chat_jid = ?
+  AND m.msg_id NOT LIKE 'import-%'
 ORDER BY m.ts DESC, m.rowid DESC
 LIMIT 1;
 
@@ -314,6 +316,7 @@ FROM messages m
 JOIN messages anchor ON anchor.chat_jid = m.chat_jid
 WHERE anchor.chat_jid = ? AND anchor.msg_id = ?
   AND (m.ts, m.rowid) > (anchor.ts, anchor.rowid)
+  AND m.msg_id NOT LIKE 'import-%'
 ORDER BY m.ts ASC, m.rowid ASC
 LIMIT 1;
 

@@ -12,6 +12,7 @@ import (
 	"github.com/openclaw/wacli/internal/config"
 	"github.com/openclaw/wacli/internal/lock"
 	"github.com/openclaw/wacli/internal/out"
+	"github.com/openclaw/wacli/internal/store"
 	"github.com/openclaw/wacli/internal/wa"
 	"github.com/spf13/cobra"
 )
@@ -62,8 +63,9 @@ func execute(args []string) error {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Version:       effectiveVersion(),
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			wa.SetLibsignalEvents(out.NewEventWriter(os.Stderr, flags.events))
+			return rejectImportedMessageIDs(cmd)
 		},
 	}
 	rootCmd.SetVersionTemplate("wacli {{.Version}}\n")
@@ -224,4 +226,19 @@ func closeApp(a *app.App, lk *lock.Lock) {
 	if lk != nil {
 		_ = lk.Release()
 	}
+}
+
+// rejectImportedMessageIDs stops commands that would send a message ID to
+// WhatsApp when that ID came from a chat-export import and is not real.
+func rejectImportedMessageIDs(cmd *cobra.Command) error {
+	switch cmd.CommandPath() {
+	case "wacli messages show", "wacli messages context", "wacli messages purge":
+		return nil
+	}
+	for _, name := range []string{"id", "reply-to"} {
+		if f := cmd.Flags().Lookup(name); f != nil && store.IsImportedMsgID(f.Value.String()) {
+			return fmt.Errorf("--%s %s is an imported message; it has no WhatsApp ID and can't be used with %q", name, f.Value.String(), cmd.Name())
+		}
+	}
+	return nil
 }
